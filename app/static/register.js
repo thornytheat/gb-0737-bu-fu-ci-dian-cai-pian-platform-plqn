@@ -14,7 +14,7 @@ const orderColumns = [column("订单号", (r) => r.id), column("布种", (r) => 
 const spanColumns = [column("起点 mm", (r) => r.start, true), column("终点 mm", (r) => r.end, true),
   column("长度 mm", (r) => r.end - r.start, true), column("依据", (r) => list(r.refs))];
 
-export function views(stage, data, activeRoll, history) {
+export function views(stage, data, activeRoll, history, supplement, supplements) {
   const roll = data?.zones.rolls.find((row) => row.id === activeRoll);
   switch (stage) {
     case "intake": return [
@@ -64,6 +64,33 @@ export function views(stage, data, activeRoll, history) {
       ["归档历史", history, [column("批次号", (r) => ({text: r.id.slice(0, 12), run: r.id})), column("验布单", (r) => r.inputs.defects.file),
         column("刀口 mm", (r) => r.kerf_mm, true), column("片数", (r) => r.piece_count, true), column("归档 UTC", (r) => r.created_at)]],
     ];
+    case "supplement": {
+      const snap = supplement?.snapshot;
+      return [
+        ["补裁裁片", snap?.placements, [column("裁片", (r) => r.id), column("卷号", (r) => ({text: r.roll, roll: r.roll})),
+          column("起点 mm", (r) => r.start, true), column("终点 mm", (r) => r.end, true),
+          column("刀口终点 mm", (r) => r.kerf_end, true), column("取自批次", (r) => r.origin.run.slice(0, 12)),
+          column("取自段 mm", (r) => interval(r.origin.span), true), column("登记", (r) => r.source)]],
+        ["补裁工单", snap?.orders, [column("订单号", (r) => r.order), column("优先", (r) => r.priority),
+          column("需求", (r) => r.requested, true), column("已排", (r) => r.planned, true), column("待补", (r) => r.remaining, true),
+          column("原因码", (r) => r.review?.code), column("说明", (r) => r.review?.message)]],
+        ["余量对平", snap?.rolls, [column("卷号", (r) => ({text: r.roll, roll: r.roll})),
+          column("卷长 mm", (r) => r.length, true), column("禁切 mm", (r) => r.base.blocked, true),
+          column("原批裁片 mm", (r) => r.base.piece, true), column("原批刀口 mm", (r) => r.base.kerf, true),
+          column("原批未用 mm", (r) => r.base.unused, true), column("补裁裁片 mm", (r) => r.supplement.piece, true),
+          column("补裁刀口 mm", (r) => r.supplement.kerf, true), column("补后剩余 mm", (r) => r.remaining, true),
+          column("差额 mm", (r) => r.delta, true)]],
+        ["合计对平", snap && [snap.totals], [column("卷长合计 mm", (r) => r.length, true),
+          column("原批裁片 mm", (r) => r.base.piece, true), column("原批刀口 mm", (r) => r.base.kerf, true),
+          column("原批未用 mm", (r) => r.base.unused, true), column("补裁裁片 mm", (r) => r.supplement.piece, true),
+          column("补裁刀口 mm", (r) => r.supplement.kerf, true), column("补后剩余 mm", (r) => r.remaining, true),
+          column("差额 mm", (r) => r.delta, true)]],
+        ["补单登记", supplements, [column("补裁单号", (r) => ({text: r.id.slice(0, 12), supp: r.id})),
+          column("订单", (r) => r.order.id), column("需求", (r) => r.order.quantity, true),
+          column("片数", (r) => r.piece_count, true), column("待补", (r) => r.shortfall, true),
+          column("补后余量 mm", (r) => r.totals.remaining, true), column("归档 UTC", (r) => r.created_at)]],
+      ];
+    }
     default: throw new Error("模块不存在");
   }
 }
@@ -95,6 +122,7 @@ export function drawTable(tab) {
         button.type = "button";
         if (value.run) button.dataset.open = value.run;
         if (value.roll) button.dataset.roll = value.roll;
+        if (value.supp) button.dataset.supp = value.supp;
         cell.append(button);
       } else {
         cell.textContent = value ?? "—";

@@ -1,0 +1,29 @@
+<form id="supplement-form" class="supp-form" hidden>
+  <div class="supp-fields">
+    <label>订单号 <input name="订单号" autocomplete="off" required></label>
+    <label>布种 <input name="布种" list="fabric-list" autocomplete="off" required></label>
+    <label>最小幅宽 <input name="最小幅宽" inputmode="decimal" autocomplete="off" required></label>
+    <label>幅宽单位
+      <select name="幅宽单位"><option>mm</option><option>cm</option><option>m</option></select>
+    </label>
+    <label>净长 <input name="净长" inputmode="decimal" autocomplete="off" required></label>
+    <label>净长单位
+      <select name="净长单位"><option>mm</option><option>cm</option><option>m</option></select>
+    </label>
+    <label>单端缝份 <input name="单端缝份" inputmode="decimal" autocomplete="off" required></label>
+    <label>缝份单位
+      <select name="缝份单位"><option>mm</option><option>cm</option><option>m</option></select>
+    </label>
+    <label>数量 <input name="数量" inputmode="numeric" autocomplete="off" required></label>
+    <label>优先级
+      <select name="优先级"><option>急</option><option>常</option></select>
+    </label>
+  </div>
+  <div class="supp-actions">
+    <button class="ink-btn" id="supp-submit" type="submit" disabled>生成补裁单</button>
+    <button id="supp-rerun" type="button" disabled>重跑核验</button>
+    <a id="supp-export" aria-disabled="true">导出补裁单</a>
+    <span id="supp-meta" role="status"></span>
+  </div>
+  <datalist id="fabric-list"></datalist>
+</form>

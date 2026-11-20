@@ -68,6 +68,8 @@ h2 { font: 700 17px/1.25 var(--font-title); letter-spacing: .055em; }
 .blocked { color: var(--accent-ink); background: repeating-linear-gradient(130deg, #ffffff28 0 2px, transparent 2px 7px), var(--blocked); }
 .kerf { background: var(--kerf); }
 .unused { background: repeating-linear-gradient(90deg, #8c773418 0 1px, transparent 1px 5px), var(--unused); }
+.segment.supp { outline: 2px dashed var(--accent-ink); outline-offset: -2px; }
+.swatch.supp { background: var(--piece); outline: 2px dashed var(--accent-ink); outline-offset: -2px; }
 .roll-status { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .roll-status.held { color: var(--warn); font-weight: 600; }
 .legend { display: flex; gap: 4px 15px; flex-wrap: wrap; list-style: none; padding: 7px 0 0; }
@@ -92,6 +94,20 @@ h2 { font: 700 17px/1.25 var(--font-title); letter-spacing: .055em; }
 .sheet .num { text-align: right; }
 .sheet tbody tr:hover { background: var(--panel); }
 .empty { padding: 10px var(--pad); color: var(--muted); }
+.supp-form { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: end; padding: 9px var(--pad);
+  border-bottom: 1px solid var(--line); background: var(--panel); }
+.supp-fields { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.supp-form label { display: grid; gap: 2px; color: var(--muted); font-size: 11px; }
+.supp-form input, .supp-form select { min-height: 26px; padding: 2px 6px; border: 1px solid var(--line-strong);
+  border-radius: var(--radius); background: var(--paper); max-width: 96px; font-size: 12px; }
+.supp-form select { max-width: none; }
+.supp-actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.supp-actions button, .supp-actions a { min-height: 26px; padding: 2px 8px; border: 1px solid var(--line-strong);
+  border-radius: var(--radius); background: var(--paper); text-decoration: none; font-size: 12px; }
+.supp-actions .ink-btn { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.supp-actions :disabled, .supp-actions [aria-disabled=true] { opacity: .54; }
+.supp-actions a[href]:hover, .supp-actions button:not(:disabled):hover { background: var(--accent-wash); color: var(--ink); }
+#supp-meta { flex-basis: 100%; color: var(--muted); font-size: 11px; }
 .footer { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 20px; min-height: 31px; padding: 4px 22px;
   color: var(--muted); background: var(--panel); border-top: 1px solid var(--line-strong); font-size: 11px; }
 .footer b { font-family: var(--font-num); }

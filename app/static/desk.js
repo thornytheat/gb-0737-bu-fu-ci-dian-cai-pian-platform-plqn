@@ -1,12 +1,14 @@
-import {at, drawAxis, drawSlip, tag} from "./exhibits.js";
+import {at, drawAxis, drawSlip, drawSuppSlip, tag} from "./exhibits.js";
 import {drawTable, views} from "./register.js";
 
-const state = {document: null, history: [], stage: "zones", tab: 0, roll: "", busy: false};
+const state = {document: null, history: [], supplements: [], supplement: null, stage: "zones", tab: 0, roll: "", busy: false};
 const navigation = [...document.querySelectorAll("nav [data-view]")];
 const form = at("plan-form");
 const sample = at("sample");
 const kerf = at("kerf");
 const exportLink = at("export");
+const suppForm = at("supplement-form");
+const suppExport = at("supp-export");
 const formatter = new Intl.DateTimeFormat("zh-CN", {timeZone: "Asia/Shanghai", dateStyle: "short", timeStyle: "medium"});
 
 async function fetchData(path, method = "GET", body) {
@@ -33,6 +35,12 @@ function archiveControls() {
   if (archived && !state.busy) exportLink.href = `/api/export/${manifest.id}`;
   else exportLink.removeAttribute("href");
   exportLink.setAttribute("aria-disabled", String(!archived || state.busy));
+  const supplement = state.supplement?.manifest;
+  at("supp-submit").disabled = !manifest || state.busy;
+  at("supp-rerun").disabled = !supplement || state.busy;
+  if (supplement && !state.busy) suppExport.href = `/api/supplements/${supplement.id}/export`;
+  else suppExport.removeAttribute("href");
+  suppExport.setAttribute("aria-disabled", String(!supplement || state.busy));
 }
 
 function heading() {
@@ -43,10 +51,17 @@ function heading() {
   const stamp = at("archive-date");
   stamp.dateTime = manifest?.created_at ?? "";
   stamp.textContent = manifest ? `${formatter.format(new Date(manifest.created_at))} · UTC+08:00` : "";
-  const totals = state.document?.snapshot.ledger.totals;
+  const suppMode = state.stage === "supplement" && state.supplement;
+  const totals = suppMode ? state.supplement.snapshot.totals : state.document?.snapshot.ledger.totals;
   for (const name of ["length", "piece", "blocked", "kerf", "unused", "delta"]) {
     at(name === "kerf" ? "kerf-total" : name).textContent = totals?.[name] ?? "—";
   }
+  const fabrics = [...new Set((state.document?.snapshot.zones.rolls ?? []).map((roll) => roll.fabric))];
+  at("fabric-list").replaceChildren(...fabrics.map((name) => {
+    const option = tag("option");
+    option.value = name;
+    return option;
+  }));
 }
 
 function rollPanel() {
@@ -64,13 +79,25 @@ function rollPanel() {
     return button;
   }));
   if (sourceFocus) picker.querySelector("[aria-pressed=true]")?.focus();
+  if (state.stage === "supplement" && state.supplement) {
+    const book = state.supplement.snapshot.rolls.find((roll) => roll.roll === state.roll);
+    const zone = rolls.find((roll) => roll.id === state.roll);
+    const pieces = state.supplement.snapshot.placements.filter((piece) => piece.roll === state.roll);
+    const slip = {roll: state.roll, fabric: zone?.fabric, width: zone?.width, length: book?.length,
+                  pieces, lengths: book?.lengths, held: book?.held,
+                  status: book ? `补后余 ${book.remaining} mm · 本卷补裁 ${pieces.length} 片` : ""};
+    drawAxis(book, slip);
+    drawSuppSlip(state.supplement, state.roll, zone);
+    return;
+  }
   const slip = data?.slips.find((item) => item.roll === state.roll);
   drawAxis(data?.ledger.rolls.find((roll) => roll.roll === state.roll), slip);
   drawSlip(slip, state.document?.manifest, data?.fit.kerf_mm);
 }
 
 function recordsPanel() {
-  const tabs = views(state.stage, state.document?.snapshot, state.roll, state.history);
+  suppForm.hidden = state.stage !== "supplement";
+  const tabs = views(state.stage, state.document?.snapshot, state.roll, state.history, state.supplement, state.supplements);
   at("view-title").textContent = navigation.find((button) => button.dataset.view === state.stage).textContent;
   const group = at("record-tabs");
   const restoreFocus = group.contains(document.activeElement);
@@ -83,6 +110,12 @@ function recordsPanel() {
   }));
   if (restoreFocus) group.querySelector("[aria-pressed=true]")?.focus();
   drawTable(tabs[state.tab]);
+  if (state.stage === "supplement") {
+    const manifest = state.supplement?.manifest;
+    at("supp-meta").textContent = manifest
+      ? `补裁单 ${manifest.id.slice(0, 12)} · 补裁 ${manifest.piece_count} 片 · 待补 ${manifest.shortfall} 片 · 补后余 ${manifest.totals.remaining} mm`
+      : state.supplements.length ? "从补单登记选择批次，或登记新补单。" : "登记短单后生成追加补裁单。";
+  }
 }
 
 function draw() {
@@ -103,6 +136,17 @@ function setRun(document) {
 async function preview() {
   const query = new URLSearchParams({sample: sample.value, kerf_mm: kerf.value});
   setRun(await fetchData(`/api/preview?${query}`));
+  state.supplements = [];
+  state.supplement = null;
+}
+
+async function openRun(id) {
+  setRun(await fetchData(`/api/runs/${id}`));
+  state.supplements = (await fetchData(`/api/runs/${id}/supplements`)).supplements;
+  state.supplement = null;
+  if (state.stage === "supplement" && state.supplements.length) {
+    state.supplement = await fetchData(`/api/supplements/${state.supplements[0].id}`);
+  }
 }
 
 async function recent() {
@@ -131,11 +175,29 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
   action(async () => {
     const outcome = await fetchData("/api/runs", "POST", {sample: sample.value, kerf_mm: Number(kerf.value)});
-    setRun(await fetchData(`/api/runs/${outcome.manifest.id}`));
+    await openRun(outcome.manifest.id);
     await recent();
     notice(outcome.reused ? "沿用原归档" : "卷宗已归档");
   });
 });
+suppForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const run = state.document?.manifest?.id;
+  if (!run) {
+    notice("请先归档批次，再登记补单。", true);
+    return;
+  }
+  action(async () => {
+    const outcome = await fetchData(`/api/runs/${run}/supplements`, "POST", Object.fromEntries(new FormData(suppForm)));
+    state.supplement = await fetchData(`/api/supplements/${outcome.manifest.id}`);
+    state.supplements = (await fetchData(`/api/runs/${run}/supplements`)).supplements;
+    notice(outcome.reused ? "沿用原补裁单" : "补裁单已归档");
+  });
+});
+at("supp-rerun").addEventListener("click", () => action(async () => {
+  await fetchData(`/api/supplements/${state.supplement.manifest.id}/rerun`, "POST");
+  notice("重算与归档一致");
+}));
 sample.addEventListener("change", () => {
   if (kerf.reportValidity()) action(preview);
   else archiveControls();
@@ -151,7 +213,13 @@ for (const button of navigation) button.addEventListener("click", () => {
   state.stage = button.dataset.view;
   state.tab = 0;
   navigation.forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
-  recordsPanel();
+  if (state.stage === "supplement" && !state.supplement && state.supplements.length) {
+    action(async () => {
+      state.supplement = await fetchData(`/api/supplements/${state.supplements[0].id}`);
+    });
+  } else {
+    recordsPanel();
+  }
 });
 at("record-tabs").addEventListener("click", (event) => {
   const button = event.target.closest("[data-tab]");
@@ -173,11 +241,14 @@ at("roll-picker").addEventListener("click", (event) => {
 at("record-table").addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button?.dataset.roll) chooseRoll(button.dataset.roll);
-  if (button?.dataset.open) action(async () => setRun(await fetchData(`/api/runs/${button.dataset.open}`)));
+  if (button?.dataset.open) action(async () => openRun(button.dataset.open));
+  if (button?.dataset.supp) action(async () => {
+    state.supplement = await fetchData(`/api/supplements/${button.dataset.supp}`);
+  });
 });
 
 action(async () => {
   await recent();
-  if (state.history.length) setRun(await fetchData(`/api/runs/${state.history[0].id}`));
+  if (state.history.length) await openRun(state.history[0].id);
   else await preview();
 });

@@ -33,14 +33,15 @@ export function drawAxis(book, slip) {
   for (const span of book.spans) {
     const width = (span.end - span.start) / book.length * 100;
     const label = span.type === "piece" ? span.id : span.type === "blocked" ? "禁切" : "";
-    const segment = tag("span", width >= 9 ? label : "", `segment ${span.type}`);
+    const segment = tag("span", width >= 9 ? label : "", `segment ${span.type}${span.batch ? " supp" : ""}`);
     segment.dataset.type = span.type;
     segment.style.left = `${span.start / book.length * 100}%`;
     segment.style.width = `${width}%`;
-    segment.title = `${TYPES[span.type]} ${span.start}–${span.end} mm${span.refs?.length ? ` · ${span.refs.join(" / ")}` : ""}`;
+    segment.title = `${TYPES[span.type]}${span.batch ? "（追加批次）" : ""} ${span.start}–${span.end} mm${span.refs?.length ? ` · ${span.refs.join(" / ")}` : ""}`;
     band.append(segment);
   }
-  const line = book.held ? slip.hold_message : `${slip.length} mm · ${slip.pieces.length} 片 · 切口 ${slip.lengths.kerf} mm`;
+  const line = book.held ? slip.hold_message
+    : (slip.status ?? `${slip.length} mm · ${slip.pieces.length} 片 · 切口 ${slip.lengths.kerf} mm`);
   axis.replaceChildren(ruler, band, tag("p", line, `roll-status${book.held ? " held" : ""}`));
 }
 
@@ -82,5 +83,50 @@ export function drawSlip(slip, manifest, kerf) {
   printable.replaceChildren();
   if (slip && manifest) {
     printable.append(tag("h1", "裁床签条"), receipt(slip, manifest, kerf));
+  }
+}
+
+function suppReceipt(document, rollId, zone) {
+  const {manifest, snapshot} = document;
+  const book = snapshot.rolls.find((roll) => roll.roll === rollId);
+  const pieces = snapshot.placements.filter((piece) => piece.roll === rollId);
+  const content = tag("div", "", "receipt");
+  const head = tag("div", "", "receipt-head");
+  head.append(tag("b", `补-${rollId}`), tag("span", "追加补裁", "stamp supp"));
+  const meta = tag("p", `补裁单 ${shortId(manifest.id)} · 原批次 ${shortId(manifest.parent)} · ${zone?.fabric ?? "—"} · ${zone?.width ?? "—"} mm`, "receipt-meta");
+  meta.title = `补裁单 ${manifest.id} · 原批次 ${manifest.parent}`;
+  const sheet = tag("dl");
+  const fields = [
+    ["卷长", `${book.length} mm`], ["本卷补裁", `${pieces.length} 片`],
+    ["补裁裁片", `${book.supplement.piece} mm`], ["补裁刀口", `${book.supplement.kerf} mm`],
+    ["补后剩余", `${book.remaining} mm`], ["刀口设定", `${snapshot.kerf_mm} mm`],
+    ["原批裁片", `${book.base.piece} mm`], ["原批刀口", `${book.base.kerf} mm`],
+  ];
+  for (const [name, value] of fields) sheet.append(tag("dt", name), tag("dd", value, "num"));
+  content.append(head, meta, sheet);
+  if (pieces.length) {
+    const lines = tag("ol");
+    for (const cut of pieces) {
+      const item = tag("li", `${cut.id}　${cut.start}–${cut.end} mm　刀口至 ${cut.kerf_end}　取自段 ${cut.origin.span.join("–")}`);
+      item.title = `取自归档 ${cut.origin.run}`;
+      lines.append(item);
+    }
+    content.append(lines);
+  }
+  const proof = tag("p", `订单 ${snapshot.order.id} · ${pieces[0]?.source ?? "补单登记"} · 原批次 ${manifest.parent}`, "receipt-sources");
+  content.append(proof);
+  const signature = tag("div", "", "signature");
+  signature.append(tag("span", "验卷 __________"), tag("span", "领卷 __________"));
+  content.append(signature);
+  return content;
+}
+
+export function drawSuppSlip(document, rollId, zone) {
+  const book = document.snapshot.rolls.find((roll) => roll.roll === rollId);
+  at("slip-body").replaceChildren(book ? suppReceipt(document, rollId, zone) : tag("p", "请选择布卷。", "empty"));
+  const printable = at("print-slip");
+  printable.replaceChildren();
+  if (book) {
+    printable.append(tag("h1", "追加补裁单"), suppReceipt(document, rollId, zone));
   }
 }

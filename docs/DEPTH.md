@@ -14,6 +14,7 @@
 | M5 换卷核算 | 确认领卷次序、实际坐标和欠料 | `GET /api/changeovers` | `app/modules/m5_changeovers/solver.py` `app/modules/m5_changeovers/placements.py` | `tests/test_changeovers.py` |
 | M6 用布勾稽 | 按卷审核切口守恒及源记录分流 | `GET /api/ledger` | `app/modules/m6_ledger/partition.py` `app/modules/m6_ledger/service.py` | `tests/test_ledger.py` |
 | M7 裁床签条 | 排版归档、同源重跑、按卷打印并下载卷宗 | `GET /api/slips` `POST /api/runs` | `app/modules/m7_slips/receipts.py` `app/modules/m7_slips/archiving.py` | `tests/test_slips.py` |
+| M8 追加补裁 | 登记短单、回读已裁卷剩余段、补裁对平与复用 | `POST /api/runs/{id}/supplements` `POST /api/supplements/{id}/rerun` | `app/modules/m8_supplement/service.py` `app/modules/m8_supplement/archiving.py` | `tests/test_supplement.py` |
 
 ## 陷阱登记
 
@@ -33,9 +34,11 @@
 | TRAP-19 | R-001 两条带安全余量的疵区重叠 20 mm | 重复扣料或留出假缝 | 归并并集并合并源行 | `app/modules/m3_zones/intervals.py` | `tests/test_zones.py::test_overlapping_allowances_are_counted_once` |
 | TRAP-23 | R-005 的裁片和刀口刚好用尽到卷尾 | 漏计最后刀口或右端算两次 | 半开区间，最后刀口须完整容纳 | `app/modules/m5_changeovers/placements.py` | `tests/test_fit.py::test_kerf_exact_fit_succeeds_when_right_edge_is_exclusive` |
 | TRAP-26 | 已归档后改变源记录文件 | 陈旧重跑覆盖原裁片坐标 | 比较文件哈希及规则身份，返回 409 | `app/modules/m7_slips/archiving.py` | `tests/test_slips.py::test_stale_source_replay_is_rejected_without_rewriting_archive` |
+| TRAP-27 | 补单回开已裁卷吃边角料 | 新刀口压进已归档坐标、余量对不上 | 剩余段只从归档回读，追加批次单独成卷并逐卷对平，同单复用 | `app/modules/m8_supplement/service.py` | `tests/test_supplement.py::test_supplement_carves_archived_remnants_and_reconciles` |
 
 ## 勾稽与局限
 
 - 卷长逐卷校验，等于合格裁片、禁切、切口和未用段之和。封存卷全长算禁切。每个区间恰好在一类中。
 - 各来源原始条数等于有效、重复和隔离之和。疵点定位隔离会在最终条数账里移动分项。
 - 只做沿卷长的条带裁切。幅宽用于每片布种匹配和最小幅宽约束。精确规划上限与输入文件限制见数据字典。
+- 追加补裁只动用已裁卷在归档批次里的未用段，留存卷与封存卷不回开。补裁单逐卷满足：原批未用 = 补裁裁片 + 补裁刀口 + 补后剩余，合并分项仍等于卷长。补裁单身份由原批次、规则版本、刀口与规范化补单哈希而成，同一补单重跑复用原版本；补裁失败不写库，原归档与旧版补裁单保留。

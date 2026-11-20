@@ -12,6 +12,7 @@ MESSAGES = {
     "SEGMENT_TOO_SHORT": "无单段可容纳该裁片", "CAPACITY_USED": "可用段已由求解方案分配",
     "STALE_RUN": "样例、刀口或规则版本已变更", "REPLAY_DIFF": "重算方案与归档不同",
     "STORE_BUSY": "归档库暂忙", "FORM_INVALID": "参数无效，检查刀口值",
+    "SUPPLEMENT_UNKNOWN": "追加补裁单不存在",
 }
 
 

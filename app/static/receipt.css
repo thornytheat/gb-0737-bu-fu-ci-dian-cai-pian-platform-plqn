@@ -9,6 +9,7 @@
 .stamp { border: 3px double var(--accent); color: var(--accent); padding: 2px 5px;
   font: 750 15px/1.2 var(--font-title); letter-spacing: .08em; white-space: nowrap; }
 .stamp.held { color: var(--warn); border-color: var(--warn); }
+.stamp.supp { color: var(--good); border-color: var(--good); }
 .receipt-meta, .receipt-sources { margin-top: 7px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .receipt dl { display: grid; grid-template-columns: 1fr auto; padding: 7px 0; border-bottom: 1px dashed var(--line-strong); }
 .receipt dl dt, .receipt dl dd { padding-block: 2px; }
